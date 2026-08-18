@@ -18,4 +18,7 @@ struct Post {
 
     /// Indices (into the thread's post array) of posts that reply to this one via `>>N`.
     let replies: [Int]?
+
+    /// Image URLs found in `text`, shown as thumbnails below the post.
+    let imageURLs: [URL]
 }

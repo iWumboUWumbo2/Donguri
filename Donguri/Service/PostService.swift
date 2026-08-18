@@ -83,7 +83,8 @@ struct PostService {
                             id: match.4.map(String.init),
                             text: text,
                             threadTitle: threadTitle,
-                            replies: nil)
+                            replies: nil,
+                            imageURLs: Self.extractImageURLs(from: text))
             }
 
         return Self.attachReplies(to: parsed)
@@ -151,7 +152,8 @@ struct PostService {
                         id: id,
                         text: text,
                         threadTitle: index == 0 ? title : nil,
-                        replies: nil)
+                        replies: nil,
+                        imageURLs: Self.extractImageURLs(from: text))
         }
 
         return Self.attachReplies(to: parsed)
@@ -189,7 +191,14 @@ struct PostService {
                  id: post.id,
                  text: post.text,
                  threadTitle: post.threadTitle,
-                 replies: repliesByIndex[index])
+                 replies: repliesByIndex[index],
+                 imageURLs: post.imageURLs)
         }
+    }
+
+    private static let imageURLRegex = #/https?:\/\/[^\s<>"']+\.(?i:jpe?g|png|gif|webp|bmp)(?:\?[^\s<>"']*)?/#
+
+    private static func extractImageURLs(from text: String) -> [URL] {
+        text.matches(of: imageURLRegex).compactMap { URL(string: String($0.0)) }
     }
 }

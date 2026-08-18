@@ -20,13 +20,18 @@ struct ThreadView: View {
     @State private var errorMessage: String?
 
     @State private var threadRoute: ThreadRoute?
-    @State private var postReplyIndex: Int?
+    @State private var replyPreviewIndices: [Int] = []
 
     // ID/trip → post indices, used to highlight every post from the same poster.
     @State private var idIndices: [String: [Int]] = [:]
     @State private var tripIndices: [String: [Int]] = [:]
     @State private var highlightedID: String?
     @State private var highlightedTrip: String?
+
+    // Read-position tracking: how far the user has scrolled, and where to
+    // resume to once a fresh load's rows exist.
+    @State private var maxSeenIndex: Int = 0
+    @State private var resumeIndex: Int?
 
     private var highlightedIndices: Set<Int> {
         if let highlightedID {
@@ -40,77 +45,98 @@ struct ThreadView: View {
 
     var body: some View {
         if let thread, let boardURL {
-            Group {
-                if !posts.isEmpty {
-                    ZStack(alignment: .top) {
-                        List {
-                            ForEach(Array(posts.enumerated()), id: \.offset) { index, post in
-                                PostView(index: index,
-                                         post: post,
-                                         idCount: post.id.flatMap { idIndices[$0]?.count } ?? 0,
-                                         tripCount: post.trip.flatMap { tripIndices[$0]?.count } ?? 0,
-                                         isIDHighlighted: post.id != nil && post.id == highlightedID,
-                                         isTripHighlighted: post.trip != nil && post.trip == highlightedTrip,
-                                         isHighlighted: highlightedIndices.contains(index),
-                                         onThreadRoute: { route in
-                                    threadRoute = route
-                                }, onPostReply: { postIndex in
-                                    postReplyIndex = postIndex
-                                }, onIDTap: { id in
-                                    toggleHighlightedID(id)
-                                }, onTripTap: { trip in
-                                    toggleHighlightedTrip(trip)
-                                })
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
-                                .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
-                            }
-                        }
-                        .safeAreaInset(edge: .top) {
-                            if let banner = highlightBannerText {
-                                HighlightBanner(text: banner) {
-                                    clearHighlight()
+            ScrollViewReader { proxy in
+                Group {
+                    if !posts.isEmpty {
+                        ZStack(alignment: .top) {
+                            List {
+                                ForEach(Array(posts.enumerated()), id: \.offset) { index, post in
+                                    PostView(index: index,
+                                             post: post,
+                                             idCount: post.id.flatMap { idIndices[$0]?.count } ?? 0,
+                                             tripCount: post.trip.flatMap { tripIndices[$0]?.count } ?? 0,
+                                             isIDHighlighted: post.id != nil && post.id == highlightedID,
+                                             isTripHighlighted: post.trip != nil && post.trip == highlightedTrip,
+                                             isHighlighted: highlightedIndices.contains(index),
+                                             onThreadRoute: { route in
+                                        threadRoute = route
+                                    }, onPostReply: { postIndex in
+                                        replyPreviewIndices = [postIndex]
+                                    }, onShowReplies: { indices in
+                                        replyPreviewIndices = indices
+                                    }, onIDTap: { id in
+                                        toggleHighlightedID(id)
+                                    }, onTripTap: { trip in
+                                        toggleHighlightedTrip(trip)
+                                    })
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                                    .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
+                                    .id(index)
+                                    .onAppear {
+                                        maxSeenIndex = max(maxSeenIndex, index)
+                                    }
                                 }
-                                .padding(.top, 6)
+                            }
+                            .safeAreaInset(edge: .top) {
+                                if let banner = highlightBannerText {
+                                    HighlightBanner(text: banner) {
+                                        clearHighlight()
+                                    }
+                                    .padding(.top, 6)
+                                }
+                            }
+
+                            // Reply preview popup — shown for a >>N tap (single post) or
+                            // tapping a post's reply-count badge (that post's full reply list).
+                            if !replyPreviewIndices.isEmpty {
+                                Color.black.opacity(0.25)
+                                    .ignoresSafeArea()
+                                    .onTapGesture { replyPreviewIndices = [] }
+
+                                ReplyPreviewCard(
+                                    indices: replyPreviewIndices,
+                                    posts: posts,
+                                    idIndices: idIndices,
+                                    tripIndices: tripIndices,
+                                    onClose: { replyPreviewIndices = [] },
+                                    onJump: { index in
+                                        replyPreviewIndices = []
+                                        withAnimation(.snappy) {
+                                            proxy.scrollTo(index, anchor: .top)
+                                        }
+                                    },
+                                    onThreadRoute: { route in
+                                        replyPreviewIndices = []
+                                        threadRoute = route
+                                    },
+                                    onShowReplies: { indices in
+                                        replyPreviewIndices = indices
+                                    }
+                                )
+                                .padding(.horizontal)
                             }
                         }
-
-                        // >>N popup overlay
-                        if let replyIndex = postReplyIndex,
-                           posts.indices.contains(replyIndex) {
-                            // Dim layer — also the tap-to-dismiss target
-                            Color.black.opacity(0.25)
-                                .ignoresSafeArea()
-                                .onTapGesture { postReplyIndex = nil }
-
-                            PostView(index: replyIndex,
-                                     post: posts[replyIndex],
-                                     idCount: posts[replyIndex].id.flatMap { idIndices[$0]?.count } ?? 0,
-                                     tripCount: posts[replyIndex].trip.flatMap { tripIndices[$0]?.count } ?? 0,
-                                     isIDHighlighted: false,
-                                     isTripHighlighted: false,
-                                     isHighlighted: false,
-                                     onThreadRoute: { route in
-                                postReplyIndex = nil
-                                threadRoute = route
-                            }, onPostReply: { postIndex in
-                                postReplyIndex = postIndex
-                            }, onIDTap: { _ in }, onTripTap: { _ in })
-                            .padding()
-                            .cardBackground(cornerRadius: 14)
-                            .padding(.horizontal)
+                        .animation(.snappy, value: replyPreviewIndices)
+                    } else if let errorMessage {
+                        ContentUnavailableView {
+                            Label("エラーが発生しました", systemImage: "exclamationmark.triangle")
+                        } description: {
+                            Text(errorMessage)
+                        }
+                    } else {
+                        ProgressView("しばらくお待ちください...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .onChange(of: resumeIndex) { _, newValue in
+                    guard let newValue else { return }
+                    resumeIndex = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        withAnimation(nil) {
+                            proxy.scrollTo(newValue, anchor: .top)
                         }
                     }
-                    .animation(.snappy, value: postReplyIndex)
-                } else if let errorMessage {
-                    ContentUnavailableView {
-                        Label("エラーが発生しました", systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(errorMessage)
-                    }
-                } else {
-                    ProgressView("しばらくお待ちください...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .listStyle(.plain)
@@ -129,6 +155,9 @@ struct ThreadView: View {
             }
             .refreshable {
                 await loadThread(boardURL: boardURL, threadId: thread.id)
+            }
+            .onDisappear {
+                persistReadState(boardURL: boardURL, threadId: thread.id)
             }
         } else {
             ContentUnavailableView("エラー：スレや板情報がありません", systemImage: "exclamationmark.triangle")
@@ -163,6 +192,7 @@ struct ThreadView: View {
     }
 
     public func loadThread(boardURL: String, threadId: Int) async {
+        let isInitialLoad = posts.isEmpty
         do {
             errorMessage = nil
             let service = PostService()
@@ -171,10 +201,29 @@ struct ThreadView: View {
             (idIndices, tripIndices) = Self.buildHighlightIndices(posts: newPosts)
             highlightedID = nil
             highlightedTrip = nil
+
+            if isInitialLoad {
+                maxSeenIndex = 0
+                let key = ReadStateStore.key(boardURL: boardURL, threadId: threadId)
+                // Only resume if there's unread content below the saved position —
+                // if the last visit already reached the end, scrolling the final row
+                // to the top would have nothing below it to anchor against.
+                if let state = ReadStateStore.shared.state(for: key),
+                   newPosts.count > 1,
+                   state.lastReadIndex < newPosts.count - 1 {
+                    resumeIndex = max(0, state.lastReadIndex)
+                }
+            }
         } catch {
             errorMessage = "エラーが発生しました: \(error)"
             print("ThreadView Error: \(error)")
         }
+    }
+
+    private func persistReadState(boardURL: String, threadId: Int) {
+        guard !posts.isEmpty else { return }
+        let key = ReadStateStore.key(boardURL: boardURL, threadId: threadId)
+        ReadStateStore.shared.update(key: key, postCount: posts.count, readIndex: maxSeenIndex)
     }
 
     private static func buildHighlightIndices(posts: [Post]) -> (id: [String: [Int]], trip: [String: [Int]]) {
@@ -221,6 +270,76 @@ private struct HighlightBanner: View {
     }
 }
 
+/// Floating card listing the replies to a post (or a single `>>N` target),
+/// each of which can itself be tapped to jump to that post in the main list.
+private struct ReplyPreviewCard: View {
+    let indices: [Int]
+    let posts: [Post]
+    let idIndices: [String: [Int]]
+    let tripIndices: [String: [Int]]
+    let onClose: () -> Void
+    let onJump: (Int) -> Void
+    let onThreadRoute: (ThreadRoute) -> Void
+    let onShowReplies: ([Int]) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(indices.count > 1 ? "返信 \(indices.count)件" : "返信")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(indices, id: \.self) { index in
+                        if posts.indices.contains(index) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Button {
+                                    onJump(index)
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text(">>\(index + 1) にジャンプ")
+                                        Image(systemName: "arrow.down.right.circle")
+                                    }
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Color.accentColor)
+                                }
+                                .buttonStyle(.plain)
+
+                                PostView(index: index,
+                                         post: posts[index],
+                                         idCount: posts[index].id.flatMap { idIndices[$0]?.count } ?? 0,
+                                         tripCount: posts[index].trip.flatMap { tripIndices[$0]?.count } ?? 0,
+                                         isIDHighlighted: false,
+                                         isTripHighlighted: false,
+                                         isHighlighted: false,
+                                         onThreadRoute: onThreadRoute,
+                                         onPostReply: { onShowReplies([$0]) },
+                                         onShowReplies: onShowReplies,
+                                         onIDTap: { _ in },
+                                         onTripTap: { _ in })
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 14)
+            }
+        }
+        .frame(maxHeight: 420)
+        .cardBackground(cornerRadius: 14)
+    }
+}
+
 struct PostView: View {
     var index: Int
     var post: Post
@@ -233,8 +352,11 @@ struct PostView: View {
 
     var onThreadRoute: (ThreadRoute) -> Void
     var onPostReply: (Int) -> Void
+    var onShowReplies: ([Int]) -> Void
     var onIDTap: (String) -> Void
     var onTripTap: (String) -> Void
+
+    @State private var fullscreenImageURL: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -247,7 +369,12 @@ struct PostView: View {
                     .background(Circle().fill(Color.accentColor.opacity(0.14)))
 
                 if let replies = post.replies, !replies.isEmpty {
-                    Chip(text: "\(replies.count)", systemImage: "message.fill", tint: .secondary, filled: false)
+                    Button {
+                        onShowReplies(replies)
+                    } label: {
+                        Chip(text: "\(replies.count)", systemImage: "message.fill", tint: .secondary, filled: false)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 nameView
@@ -277,6 +404,21 @@ struct PostView: View {
                     return .systemAction(prefersInApp: true)
                 })
 
+            if !post.imageURLs.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(post.imageURLs, id: \.self) { url in
+                            Button {
+                                fullscreenImageURL = url
+                            } label: {
+                                ImageThumbnail(url: url)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
             HStack {
                 Text(post.date)
                     .font(.caption2)
@@ -301,6 +443,16 @@ struct PostView: View {
             if isHighlighted {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(Color.accentColor, lineWidth: 1.5)
+            }
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { fullscreenImageURL != nil },
+            set: { isPresented in if !isPresented { fullscreenImageURL = nil } }
+        )) {
+            if let fullscreenImageURL {
+                FullscreenImageView(url: fullscreenImageURL) {
+                    self.fullscreenImageURL = nil
+                }
             }
         }
     }
@@ -341,6 +493,27 @@ struct PostView: View {
         let boardURL = "https://\(host)/\(directoryName)/"
 
         return ThreadRoute(boardURL: boardURL, threadId: threadId)
+    }
+}
+
+private struct ImageThumbnail: View {
+    let url: URL
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().scaledToFill()
+            case .failure:
+                Image(systemName: "photo.badge.exclamationmark")
+                    .foregroundStyle(.secondary)
+            default:
+                ProgressView()
+            }
+        }
+        .frame(width: 84, height: 84)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 

@@ -14,42 +14,40 @@ struct BoardView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
-            if let board {
-                Group {
-                    if !threads.isEmpty {
-                        List(threads) { thread in
-                            NavigationLink {
-                                ThreadView(thread: thread, boardURL: board.url)
-                            } label: {
-                                ThreadRowView(thread: thread)
-                            }
-                            .padding(.vertical, 4)
+        if let board {
+            Group {
+                if !threads.isEmpty {
+                    List(threads) { thread in
+                        NavigationLink {
+                            ThreadView(thread: thread, boardURL: board.url)
+                        } label: {
+                            ThreadRowView(thread: thread, boardURL: board.url)
                         }
-                        .listStyle(.plain)
-
-                    } else if let errorMessage {
-                        ContentUnavailableView {
-                            Label("エラーが発生しました", systemImage: "exclamationmark.triangle")
-                        } description: {
-                            Text(errorMessage)
-                        }
-                    } else {
-                        ProgressView("しばらくお待ちください...")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.vertical, 4)
                     }
+                    .listStyle(.plain)
+
+                } else if let errorMessage {
+                    ContentUnavailableView {
+                        Label("エラーが発生しました", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(errorMessage)
+                    }
+                } else {
+                    ProgressView("しばらくお待ちください...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .navigationTitle(board.boardName)
-                .navigationBarTitleDisplayMode(.inline)
-                .task {
-                    await loadBoard(board: board)
-                }
-                .refreshable {
-                    await loadBoard(board: board)
-                }
-            } else {
-                ContentUnavailableView("エラー：板情報がありません", systemImage: "exclamationmark.triangle")
             }
+            .navigationTitle(board.boardName)
+            .navigationBarTitleDisplayMode(.inline)
+            .task {
+                await loadBoard(board: board)
+            }
+            .refreshable {
+                await loadBoard(board: board)
+            }
+        } else {
+            ContentUnavailableView("エラー：板情報がありません", systemImage: "exclamationmark.triangle")
         }
     }
     
@@ -68,6 +66,15 @@ struct BoardView: View {
 
 struct ThreadRowView: View {
     let thread: Thread
+    let boardURL: String
+
+    private var unreadCount: Int? {
+        guard let state = ReadStateStore.shared.state(
+            for: ReadStateStore.key(boardURL: boardURL, threadId: thread.id)
+        ) else { return nil }
+        let unread = thread.responseCount - state.lastReadCount
+        return unread > 0 ? unread : nil
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -90,7 +97,12 @@ struct ThreadRowView: View {
 
             Spacer()
 
-            Chip(text: "\(thread.responseCount)", systemImage: "message.fill")
+            VStack(alignment: .trailing, spacing: 4) {
+                Chip(text: "\(thread.responseCount)", systemImage: "message.fill")
+                if let unreadCount {
+                    Chip(text: "+\(unreadCount)", tint: .red)
+                }
+            }
        }
     }
 }
