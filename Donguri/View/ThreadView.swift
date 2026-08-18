@@ -33,6 +33,17 @@ struct ThreadView: View {
     @State private var maxSeenIndex: Int = 0
     @State private var resumeIndex: Int?
 
+    // Popup dictionary
+    @Environment(UserConfig.self) private var userConfig
+    @State private var selectionData: SelectionData?
+    @State private var lookupResults: [LookupResult] = []
+    @State private var dictionaryStyles: [String: String] = [:]
+    @State private var showPopup = false
+    @State private var clearSelection = false
+    // PopupView caches its rendered content in @State at init, so it needs a
+    // fresh identity per lookup — otherwise it keeps the empty first render.
+    @State private var popupGeneration = 0
+
     private var highlightedIndices: Set<Int> {
         if let highlightedID {
             return Set(idIndices[highlightedID] ?? [])
@@ -45,6 +56,7 @@ struct ThreadView: View {
 
     var body: some View {
         if let thread, let boardURL {
+            GeometryReader { geometry in
             ScrollViewReader { proxy in
                 Group {
                     if !posts.isEmpty {
@@ -68,6 +80,10 @@ struct ThreadView: View {
                                         toggleHighlightedID(id)
                                     }, onTripTap: { trip in
                                         toggleHighlightedTrip(trip)
+                                    }, onTextSelected: { selection in
+                                        handleTextSelection(selection)
+                                    }, onTapOutside: {
+                                        dismissPopup()
                                     })
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
@@ -138,6 +154,28 @@ struct ThreadView: View {
                         }
                     }
                 }
+                .overlay {
+                    PopupView(
+                        userConfig: userConfig,
+                        isVisible: $showPopup,
+                        selectionData: selectionData,
+                        lookupResults: lookupResults,
+                        dictionaryStyles: dictionaryStyles,
+                        screenSize: geometry.size,
+                        isVertical: false,
+                        isFullWidth: userConfig.popupFullWidth,
+                        topInset: UIApplication.topSafeArea,
+                        bottomInset: UIApplication.bottomSafeArea,
+                        coverURL: nil,
+                        documentTitle: thread.title ?? posts.first?.threadTitle,
+                        clearSelection: clearSelection,
+                        onTextSelected: { handleTextSelection($0) },
+                        onTapOutside: { dismissPopup() },
+                        onSwipeDismiss: { dismissPopup() }
+                    )
+                    .id(popupGeneration)
+                }
+            }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -218,6 +256,42 @@ struct ThreadView: View {
             errorMessage = "エラーが発生しました: \(error)"
             print("ThreadView Error: \(error)")
         }
+    }
+
+    /// Runs a dictionary lookup for the tapped text and shows the popup.
+    /// Returns how many characters matched, so selection.js can highlight them.
+    private func handleTextSelection(_ selection: SelectionData) -> Int? {
+        let results = LookupEngine.shared.lookup(
+            selection.text,
+            maxResults: userConfig.maxResults,
+            scanLength: userConfig.scanLength
+        )
+        guard let first = results.first else {
+            dismissPopup()
+            return nil
+        }
+
+        var styles: [String: String] = [:]
+        for style in LookupEngine.shared.getStyles() {
+            styles[style.dictName] = style.styles
+        }
+
+        selectionData = selection
+        lookupResults = results
+        dictionaryStyles = styles
+        popupGeneration += 1
+        withAnimation(.default.speed(2.2)) {
+            showPopup = true
+        }
+        return first.matched.count
+    }
+
+    private func dismissPopup() {
+        guard showPopup else { return }
+        withAnimation(.default.speed(2.4)) {
+            showPopup = false
+        }
+        clearSelection.toggle()
     }
 
     private func persistReadState(boardURL: String, threadId: Int) {
@@ -355,8 +429,12 @@ struct PostView: View {
     var onShowReplies: ([Int]) -> Void
     var onIDTap: (String) -> Void
     var onTripTap: (String) -> Void
+    var onTextSelected: (SelectionData) -> Int? = { _ in nil }
+    var onTapOutside: () -> Void = {}
 
+    @Environment(UserConfig.self) private var userConfig
     @State private var fullscreenImageURL: URL?
+    @State private var textHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -380,29 +458,18 @@ struct PostView: View {
                 nameView
             }
 
-            // .init makes it an AttributedString, allowing hyperlinks to be clickable
-            Text(.init(post.text))
-                .lineSpacing(4)
-                .environment(\.openURL, OpenURLAction { url in
-                    // Same-thread reply anchor (>>N)
-                    if url.scheme == "donguri", url.host == "res",
-                       let number = Int(url.lastPathComponent), number >= 1 {
-                        onPostReply(number - 1)
-                        return .handled
-                    }
-
-                    // Link to another 5ch thread
-                    if let route = parseThreadLink(url: url) {
-                        onThreadRoute(route)
-                        return .handled
-                    }
-
-                    // Everything else → in-app Safari
-                    guard url.scheme == "http" || url.scheme == "https" else {
-                        return .systemAction   // no prefersInApp → iOS routes it normally
-                    }
-                    return .systemAction(prefersInApp: true)
-                })
+            // Rendered in a webview rather than SwiftUI Text so selection.js can
+            // do tap-to-lookup on individual words.
+            PostTextWebView(
+                html: post.text.asPostHTML,
+                scanNonJapaneseText: userConfig.scanNonJapaneseText,
+                onTextSelected: onTextSelected,
+                onTapOutside: onTapOutside,
+                onPostReply: onPostReply,
+                onThreadRoute: onThreadRoute,
+                onHeightChange: { textHeight = $0 }
+            )
+            .frame(height: max(textHeight, 1))
 
             if !post.imageURLs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -477,23 +544,6 @@ struct PostView: View {
         }
     }
 
-    private func parseThreadLink(url: URL) -> ThreadRoute? {
-        guard let host = url.host, host.contains(".5ch.") else {
-            return nil
-        }
-
-        let components = url.pathComponents
-
-        guard let cgiIndex = components.firstIndex(of: "read.cgi"),
-              components.count > cgiIndex + 2,
-              let threadId = Int(components[cgiIndex + 2]) else {
-            return nil
-        }
-        let directoryName = components[cgiIndex + 1]
-        let boardURL = "https://\(host)/\(directoryName)/"
-
-        return ThreadRoute(boardURL: boardURL, threadId: threadId)
-    }
 }
 
 private struct ImageThumbnail: View {

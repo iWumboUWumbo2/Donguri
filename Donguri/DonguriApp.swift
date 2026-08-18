@@ -9,9 +9,20 @@ import SwiftUI
 
 @main
 struct DonguriApp: App {
+    @State private var userConfig = UserConfig()
+    // Instantiated at launch (not lazily on first settings visit) so the
+    // dictionaries are loaded into LookupEngine before any post is tapped.
+    @State private var dictionaryManager = DictionaryManager.shared
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(userConfig)
+                .task {
+                    if userConfig.autoUpdateDictionaries {
+                        dictionaryManager.autoUpdateDictionaries()
+                    }
+                }
         }
     }
 }

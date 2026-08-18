@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		6B486FF02FDF29C400F1F455 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 6B486FF12FDF29C400F1F455 /* CHoshiDicts */; };
+		6B486FF32FDF29C400F1F455 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 6B486FF42FDF29C400F1F455 /* ZIPFoundation */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		6B486FDE2FDF29C400F1F455 /* Donguri.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Donguri.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B486FF02FDF29C400F1F455 /* CHoshiDicts in Frameworks */,
+				6B486FF32FDF29C400F1F455 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = Donguri;
 			packageProductDependencies = (
+				6B486FF12FDF29C400F1F455 /* CHoshiDicts */,
+				6B486FF42FDF29C400F1F455 /* ZIPFoundation */,
 			);
 			productName = Donguri;
 			productReference = 6B486FDE2FDF29C400F1F455 /* Donguri.app */;
@@ -94,6 +103,10 @@
 			);
 			mainGroup = 6B486FD52FDF29C400F1F455;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6B486FF22FDF29C400F1F455 /* XCRemoteSwiftPackageReference "hoshidicts" */,
+				6B486FF52FDF29C400F1F455 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6B486FDF2FDF29C400F1F455 /* Products */;
 			projectDirPath = "";
@@ -132,7 +145,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -195,7 +208,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -269,8 +282,10 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Donguri/Donguri-Bridging-Header.h";
+				SWIFT_OBJC_INTEROP_MODE = objcxx;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -300,13 +315,47 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Donguri/Donguri-Bridging-Header.h";
+				SWIFT_OBJC_INTEROP_MODE = objcxx;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6B486FF22FDF29C400F1F455 /* XCRemoteSwiftPackageReference "hoshidicts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Manhhao/hoshidicts.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		6B486FF52FDF29C400F1F455 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6B486FF12FDF29C400F1F455 /* CHoshiDicts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6B486FF22FDF29C400F1F455 /* XCRemoteSwiftPackageReference "hoshidicts" */;
+			productName = CHoshiDicts;
+		};
+		6B486FF42FDF29C400F1F455 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6B486FF52FDF29C400F1F455 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		6B486FD92FDF29C400F1F455 /* Build configuration list for PBXProject "Donguri" */ = {

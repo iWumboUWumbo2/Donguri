@@ -1,0 +1,497 @@
+//
+//  DictionarySearchView.swift
+//  Donguri
+//
+//  Ported from Hoshi Reader; reads Swift-native lookup types and has no book
+//  context (coverURL/documentTitle are nil).
+//
+//  Copyright © 2026 Manhhao.
+//  SPDX-License-Identifier: GPL-3.0-or-later
+//
+
+import SwiftUI
+
+struct PopupItem: Identifiable {
+    let id: UUID = UUID()
+    var showPopup: Bool
+    var currentSelection: SelectionData?
+    var lookupResults: [LookupResult] = []
+    var dictionaryStyles: [String: String] = [:]
+    var isVertical: Bool
+    var isFullWidth: Bool
+    var clearSelection: Bool
+}
+
+struct DictionarySearchView: View {
+    private static let resetTextFieldScrollThreshold: CGFloat = 80
+    
+    @Environment(UserConfig.self) private var userConfig
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var query: String = ""
+    @State private var lastQuery: String = ""
+    @State private var content: String = ""
+    @State private var dictionaryStyles: [String: String] = [:]
+    @State private var lookupEntries: [[String: Any]] = []
+    @State private var hasSearched = false
+    @State private var searchFocused = false
+    @State private var didInitialQuery = false
+    @State private var popups: [PopupItem] = []
+    @State private var clearSelection: Bool = false
+    @State private var backCount: Int = 0
+    @State private var forwardCount: Int = 0
+    @State private var backTrigger: Bool = false
+    @State private var forwardTrigger: Bool = false
+    @State private var isDragging: Bool = false
+    @State private var isRefreshing: Bool = false
+    @State private var isResettingTextField: Bool = false
+    @State private var scrollViewInitialContentOffset: CGFloat! = nil
+    @State private var scrollViewContentOffset: CGFloat! = nil
+    var initialQuery: String = ""
+    var initialAutofocus: Bool = true
+    var shouldFocus: Bool = false
+    
+    private var usesTopTabBarLayout: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular
+    }
+    
+    private var searchBarInset: CGFloat {
+        usesTopTabBarLayout ? 100 : 50
+    }
+    
+    private var tabBarInset: CGFloat {
+        usesTopTabBarLayout ? 0 : 45
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                PopupWebView(
+                    content: content,
+                    position: .zero,
+                    scale: CGFloat(userConfig.popupScale),
+                    clearSelection: clearSelection,
+                    dictionaryStyles: dictionaryStyles,
+                    lookupEntries: lookupEntries,
+                    scanNonJapaneseText: userConfig.scanNonJapaneseText,
+                    scanLength: userConfig.scanLength,
+                    backTrigger: backTrigger,
+                    forwardTrigger: forwardTrigger,
+                    onMine: { minedContent in
+                        await AnkiManager.shared.addNote(content: minedContent, context: MiningContext(sentence: lastQuery, documentTitle: nil, coverURL: nil))
+                    },
+                    onTextSelected: {
+                        closePopups()
+                        return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
+                    },
+                    onTapOutside: closePopups,
+                    onRedirect: { query in
+                        closePopups()
+                        let results = LookupEngine.shared.lookup(query, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength)
+                        let entries = PopupView.buildLookupEntries(lookupResults: results)
+                        if !entries.isEmpty {
+                            backCount += 1
+                            forwardCount = 0
+                        }
+                        return entries
+                    },
+                    scrollViewBounces: true,
+                    onScrollViewOffsetChanged: { newOffset in
+                        if scrollViewInitialContentOffset == nil {
+                            scrollViewInitialContentOffset = newOffset
+                        }
+                        scrollViewContentOffset = newOffset
+                    },
+                    onScrollViewWillBeginDragging: {
+                        isDragging = true
+                    },
+                    onScrollViewDidEndDragging: {
+                        isDragging = false
+                        if scrollViewInitialContentOffset - scrollViewContentOffset > Self.resetTextFieldScrollThreshold {
+                            isRefreshing = true
+                            if !query.isEmpty {
+                                isResettingTextField = true
+                            }
+                        }
+                    },
+                    onScrollViewDidEndDecelerating: {
+                        isRefreshing = false
+                        isResettingTextField = false
+                    }
+                )
+                .id(lastQuery)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 30)
+                        .onEnded { value in
+                            let dx = value.translation.width
+                            let dy = value.translation.height
+                            
+                            guard abs(dx) > abs(dy) && abs(dy) < 20 else { return }
+                            
+                            if dx > 0 {
+                                guard backCount > 0 else { return }
+                                backTrigger.toggle()
+                                backCount -= 1
+                                forwardCount += 1
+                            } else {
+                                guard forwardCount > 0 else { return }
+                                forwardTrigger.toggle()
+                                forwardCount -= 1
+                                backCount += 1
+                            }
+                        }
+                )
+                
+                ForEach($popups) { $popup in
+                    let popupId = popup.id
+                    PopupView(
+                        userConfig: userConfig,
+                        isVisible: $popup.showPopup,
+                        selectionData: popup.currentSelection,
+                        lookupResults: popup.lookupResults,
+                        dictionaryStyles: popup.dictionaryStyles,
+                        screenSize: geometry.size,
+                        isVertical: popup.isVertical,
+                        isFullWidth: popup.isFullWidth,
+                        topInset: UIApplication.topSafeArea + searchBarInset,
+                        bottomInset: max(UIApplication.bottomSafeArea, 30) + tabBarInset,
+                        coverURL: nil,
+                        documentTitle: nil,
+                        clearSelection: popup.clearSelection,
+                        onTextSelected: {
+                            if let index = popups.firstIndex(where: { $0.id == popupId }) {
+                                closeChildPopups(parent: index)
+                            }
+                            return handleTextSelection($0, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength, isVertical: false, isFullWidth: false)
+                        },
+                        onTapOutside: {
+                            if let index = popups.firstIndex(where: { $0.id == popupId }) {
+                                closeChildPopups(parent: index)
+                            }
+                        },
+                        onSwipeDismiss: {
+                            guard let index = popups.firstIndex(where: { $0.id == popupId }),
+                                  popups.indices.contains(index) else {
+                                return
+                            }
+                            if index == 0 {
+                                clearSelection.toggle()
+                                closePopups()
+                            } else if popups.indices.contains(index - 1) {
+                                popups[index - 1].clearSelection.toggle()
+                                closeChildPopups(parent: index - 1)
+                            }
+                        }
+                    )
+                    .zIndex(Double(100 + (popups.firstIndex(where: { $0.id == popupId }) ?? 0)))
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .overlay(alignment: .top) {
+            LinearGradient(colors: [Color(.systemBackground), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: UIApplication.topSafeArea + 50)
+                .ignoresSafeArea(edges: .top)
+        }
+        .safeAreaInset(edge: .top) {
+            VStack {
+                DictionarySearchBar(text: $query, isFocused: $searchFocused) {
+                    runLookup()
+                }
+                
+                if let scrollViewInitialContentOffset {
+                    SearchResetInset(
+                        scrollDistance: scrollViewInitialContentOffset - scrollViewContentOffset,
+                        threshold: Self.resetTextFieldScrollThreshold,
+                        isQueryEmpty: query.isEmpty,
+                        isRefreshing: isRefreshing,
+                        isDragging: isDragging,
+                        isResettingTextField: isResettingTextField
+                    )
+                }
+            }
+        }
+        .onChange(of: shouldFocus) {
+            searchFocused = true
+        }
+        .onChange(of: isRefreshing, { _, isRefreshing in
+            if isRefreshing {
+                query = ""
+                searchFocused = true
+            }
+        })
+        .onAppear {
+            if !didInitialQuery && !initialQuery.isEmpty {
+                query = initialQuery
+                runLookup()
+            }
+            if initialAutofocus || didInitialQuery {
+                searchFocused = false
+                Task { @MainActor in
+                    searchFocused = true
+                }
+            } else {
+                searchFocused = false
+                didInitialQuery = true
+            }
+        }
+    }
+    
+    private func runLookup() {
+        closePopups()
+        backCount = 0
+        forwardCount = 0
+        
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        hasSearched = true
+        lastQuery = trimmed
+        
+        guard !trimmed.isEmpty else {
+            content = ""
+            lookupEntries = []
+            dictionaryStyles = [:]
+            return
+        }
+        
+        let results = LookupEngine.shared.lookup(trimmed, maxResults: userConfig.maxResults, scanLength: userConfig.scanLength)
+        if results.isEmpty {
+            content = ""
+            lookupEntries = []
+            dictionaryStyles = [:]
+            return
+        }
+        
+        let styles = LookupEngine.shared.getStyles()
+        constructHtml(results: results, styles: styles)
+    }
+    
+    private func handleTextSelection(_ selection: SelectionData, maxResults: Int, scanLength: Int,  isVertical: Bool, isFullWidth: Bool) -> Int? {
+        let lookupResults = LookupEngine.shared.lookup(selection.text, maxResults: maxResults, scanLength: scanLength)
+        var dictionaryStyles: [String: String] = [:]
+        for style in LookupEngine.shared.getStyles() {
+            dictionaryStyles[style.dictName] = style.styles
+        }
+        let popup = PopupItem(
+            showPopup: false,
+            currentSelection: selection,
+            lookupResults: lookupResults,
+            dictionaryStyles: dictionaryStyles,
+            isVertical: isVertical,
+            isFullWidth: isFullWidth,
+            clearSelection: false
+        )
+        popups.append(popup)
+        
+        if let firstResult = lookupResults.first {
+            withAnimation(.default.speed(2.2)) {
+                popups = popups.map {
+                    var p = $0
+                    if p.id == popup.id {
+                        p.showPopup = true
+                    }
+                    return p
+                }
+            }
+            return firstResult.matched.count
+        }
+        return nil
+    }
+    
+    private func closePopups() {
+        guard !popups.isEmpty else { return }
+        let popupIds = Set(popups.map(\.id))
+        withAnimation(.default.speed(2.4)) {
+            popups = popups.map {
+                var p = $0
+                p.showPopup = false
+                return p
+            }
+        } completion: {
+            popups.removeAll { popupIds.contains($0.id) }
+        }
+    }
+    
+    private func closeChildPopups(parent: Int) {
+        let popupIds = Set(popups.dropFirst(parent + 1).map(\.id))
+        guard !popupIds.isEmpty else { return }
+        withAnimation(.default.speed(2.4)) {
+            popups = popups.map {
+                var p = $0
+                if popupIds.contains(p.id) {
+                    p.showPopup = false
+                }
+                return p
+            }
+        } completion: {
+            popups.removeAll { popupIds.contains($0.id) }
+        }
+    }
+    
+    private func constructHtml(results: [LookupResult], styles: [DictionaryStyle]) {
+        dictionaryStyles = [:]
+        for style in styles {
+            dictionaryStyles[style.dictName] = style.styles
+        }
+        lookupEntries = PopupView.buildLookupEntries(lookupResults: results)
+        
+        let collapsedDictionaries = userConfig.collapseMode == .custom
+        ? ((try? JSONEncoder().encode(DictionaryManager.shared.collapsedDictionaries))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]") : "[]"
+        let audioSources = (try? JSONEncoder().encode(userConfig.enabledAudioSources))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let scaledCSS = userConfig.customCSS.replacingOccurrences(of: #"(-?(?:\d+(?:\.\d+)?|\.\d+))px"#, with: "calc($1px * var(--popup-scale))", options: .regularExpression)
+        let customCSS = (try? JSONSerialization.data(withJSONObject: scaledCSS, options: .fragmentsAllowed))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+        
+        content = """
+        <style>.overlay { padding-bottom: 90px; }</style>
+        <script>
+            window.collapseMode = "\(userConfig.collapseMode.rawValue)";
+            window.expandFirstDictionary = \(userConfig.expandFirstDictionary);
+            window.collapsedDictionaries = \(collapsedDictionaries);
+            window.twoColumnLayout = \(userConfig.twoColumnLayout);
+            window.compactGlossaries = \(userConfig.compactGlossaries);
+            window.showExpressionTags = \(userConfig.showExpressionTags);
+            window.harmonicFrequency = \(userConfig.harmonicFrequency);
+            window.deduplicatePitchAccents = \(userConfig.deduplicatePitchAccents);
+            window.compactPitchAccents = \(userConfig.compactPitchAccents);
+            window.audioSources = \(audioSources);
+            window.audioEnableAutoplay = \(userConfig.audioEnableAutoplay);
+            window.audioPlaybackMode = "\(userConfig.audioPlaybackMode.rawValue)";
+            window.needsAudio = \(AnkiManager.shared.needsAudio);
+            window.allowDupes = \(AnkiManager.shared.allowDupes);
+            window.useAnkiConnect = \(AnkiManager.shared.useAnkiConnect);
+            window.embedMedia = \(AnkiManager.shared.embedMedia);
+            window.compactGlossariesAnki = \(AnkiManager.shared.compactGlossaries);
+            window.customCSS = \(customCSS);
+        </script>
+        <div style="height: 50px;"></div>
+        <div id="entries-container" style="min-height: 100vh;"></div>
+        """
+    }
+    
+}
+
+struct DictionarySearchBar: Equatable, View {
+    
+    static func == (lhs: DictionarySearchBar, rhs: DictionarySearchBar) -> Bool {
+        lhs.text == rhs.text && lhs.isFocused == rhs.isFocused
+    }
+    
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    let onSubmit: () -> Void
+    
+    var body: some View {
+        if #available(iOS 26, *) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                
+                CustomSearchField(searchText: $text, isFocused: $isFocused, onSubmit: onSubmit)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                if !text.isEmpty {
+                    Button {
+                        text = ""
+                        isFocused = true
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 12)
+            .glassEffect(.regular.interactive())
+            .contentShape(Capsule())
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+        }
+        else {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                
+                CustomSearchField(searchText: $text, isFocused: $isFocused, onSubmit: onSubmit)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                if !text.isEmpty {
+                    Button {
+                        text = ""
+                        isFocused = true
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().stroke(Color.primary.opacity(0.2), lineWidth: 1))
+            .contentShape(Capsule())
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+        }
+    }
+}
+
+fileprivate struct SearchResetInset: View {
+    private let scrollDistance: CGFloat
+    private let threshold: CGFloat
+    private let isQueryEmpty: Bool
+    private let isRefreshing: Bool
+    private let isDragging: Bool
+    private let isResettingTextField: Bool
+    
+    private var pullTitle: String {
+        isQueryEmpty ? "Pull down to show keyboard" : "Pull down to clear"
+    }
+    
+    private var releaseTitle: String {
+        isQueryEmpty && !isResettingTextField ? "Release to show keyboard" : "Release to clear"
+    }
+    
+    private var height: CGFloat {
+        max(0, min(scrollDistance, threshold))
+    }
+    
+    private var hasReachedThreshold: Bool {
+        scrollDistance > threshold
+    }
+    
+    private var rotateCondition: Bool {
+        (hasReachedThreshold && isDragging) || isRefreshing
+    }
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "arrow.down")
+                .font(.system(size: 30, weight: .regular))
+                .rotationEffect(.degrees(rotateCondition ? 180 : 0))
+            
+            Text(rotateCondition ? releaseTitle : pullTitle)
+                .font(.system(size: 15))
+                .contentTransition(.identity)
+        }
+        .frame(height: threshold)
+        .frame(maxWidth: .infinity)
+        .frame(height: height, alignment: .bottom)
+        .clipped()
+        .allowsHitTesting(false)
+        .animation(.easeInOut(duration: 0.15), value: hasReachedThreshold)
+    }
+    
+    init(scrollDistance: CGFloat, threshold: CGFloat, isQueryEmpty: Bool, isRefreshing: Bool, isDragging: Bool, isResettingTextField: Bool) {
+        self.scrollDistance = scrollDistance
+        self.threshold = threshold
+        self.isQueryEmpty = isQueryEmpty
+        self.isRefreshing = isRefreshing
+        self.isDragging = isDragging
+        self.isResettingTextField = isResettingTextField
+    }
+}

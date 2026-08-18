@@ -10,6 +10,8 @@ import SwiftUI
 struct BBSMenuView: View {
     @State private var menu: BBSMenu?
     @State private var errorMessage: String?
+    @State private var showSettings = false
+    @State private var showDictionarySearch = false
 
     var body: some View {
         NavigationStack {
@@ -28,6 +30,39 @@ struct BBSMenuView: View {
                 }
             }
             .navigationTitle("５ちゃんねる")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showDictionarySearch = true
+                    } label: {
+                        Image(systemName: "character.book.closed.ja")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
+            .sheet(isPresented: $showDictionarySearch) {
+                NavigationStack {
+                    DictionarySearchView()
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button {
+                                    showDictionarySearch = false
+                                } label: {
+                                    Image(systemName: "xmark")
+                                }
+                            }
+                        }
+                }
+            }
         }
         .task {
             await loadMenu()
