@@ -1,0 +1,41 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3D2A1C"/>
+      <stop offset="100%" stop-color="#2A1B11"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#bgGrad)"/>
+
+  <!-- stem -->
+  <path d="M100 46 C 100 36, 108 30, 116 32 C 110 36, 108 42, 108 48 Z" fill="#8A6444"/>
+
+  <!-- cap -->
+  <path d="M40 84
+           C 40 56, 70 42, 100 42
+           C 130 42, 160 56, 160 84
+           C 160 91, 151 95, 139 92
+           C 129 97, 117 93, 100 95
+           C 83 93, 71 97, 61 92
+           C 49 95, 40 91, 40 84 Z"
+        fill="#8A6444"/>
+
+  <!-- cap texture lines -->
+  <g stroke="#2A1B11" stroke-width="2.2" stroke-linecap="round" opacity="0.6">
+    <path d="M55 65 C 71 58, 129 58, 145 65" fill="none"/>
+    <path d="M50 74 C 69 67, 131 67, 150 74" fill="none"/>
+    <path d="M46 82 C 69 76, 131 76, 154 82" fill="none"/>
+  </g>
+
+  <!-- nut body -->
+  <path d="M56 90
+           C 48 90, 46 97, 48 106
+           C 52 130, 74 166, 100 170
+           C 126 166, 148 130, 152 106
+           C 154 97, 152 90, 144 90
+           C 130 96, 114 90, 100 90
+           C 86 90, 70 96, 56 90 Z"
+        fill="#D9A566"/>
+</svg>
