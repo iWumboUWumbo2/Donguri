@@ -95,7 +95,7 @@ struct AnkiView: View {
                     Text("Config", tableName: "Dictionaries")
                 } footer: {
                     if !ankiManager.useAnkiConnect {
-                        Text("Importing a .colpkg/.apkg backup from Anki will allow Hoshi Reader to check for duplicates immediately. It's recommended to do this periodically to reduce drift.", tableName: "Dictionaries")
+                        Text("Importing a .colpkg/.apkg backup from Anki will allow Donguri to check for duplicates immediately. It's recommended to do this periodically to reduce drift.", tableName: "Dictionaries")
                     }
                 }
                 
