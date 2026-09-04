@@ -12,12 +12,13 @@ struct BBSMenuView: View {
     @State private var errorMessage: String?
     @State private var showSettings = false
     @State private var showDictionarySearch = false
+    @State private var searchText: String = ""
 
     var body: some View {
         NavigationStack {
             Group {
                 if let menu {
-                    MenuListView(menu: menu)
+                    MenuListView(menu: menu, searchText: searchText)
                 } else if let errorMessage {
                     ContentUnavailableView {
                         Label("エラーが発生しました", systemImage: "exclamationmark.triangle")
@@ -30,8 +31,9 @@ struct BBSMenuView: View {
                 }
             }
             .navigationTitle("５ちゃんねる")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showDictionarySearch = true
                     } label: {
@@ -70,6 +72,11 @@ struct BBSMenuView: View {
         .refreshable {
             await loadMenu()
         }
+        .searchable(
+                    text: $searchText,
+                    placement: .navigationBarDrawer(displayMode: .automatic),
+                    prompt: "フィルタ"
+                )
     }
 
     private func loadMenu() async {
@@ -87,11 +94,19 @@ struct BBSMenuView: View {
 
 struct MenuListView: View {
     let menu: BBSMenu
+    let searchText: String
 
+    var filteredMenuList: [BBSMenu.MenuList] {
+        guard !searchText.isEmpty else { return menu.menuList }
+        return menu.menuList.filter {
+            $0.categoryContent.contains(where: { $0.boardName.localizedCaseInsensitiveContains(searchText) })
+        }
+    }
+    
     var body: some View {
         List {
-            ForEach(menu.menuList) { category in
-                CategoryDisclosureView(category: category)
+            ForEach(filteredMenuList) { category in
+                CategoryDisclosureView(category: category, searchText: searchText)
             }
         }
         .listStyle(.insetGrouped)
@@ -101,10 +116,18 @@ struct MenuListView: View {
 
 struct CategoryDisclosureView: View {
     let category: BBSMenu.MenuList
+    let searchText: String
+    
+    var filteredCategoryContent: [BBSMenu.CategoryContent] {
+        guard !searchText.isEmpty else { return category.categoryContent }
+        return category.categoryContent.filter {
+            $0.boardName.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
     var body: some View {
-        DisclosureGroup {
-            ForEach(category.categoryContent) { board in
+        DisclosureGroup() {
+            ForEach(filteredCategoryContent) { board in
                 NavigationLink {
                     BoardView(board: board)
                 } label: {
