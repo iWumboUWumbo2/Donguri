@@ -91,6 +91,14 @@ struct ThreadView: View {
                                         handleTextSelection(selection)
                                     }, onTapOutside: {
                                         dismissPopup()
+                                    }, onReport: {
+                                        ReportService.report(
+                                            post: post,
+                                            index: index,
+                                            boardURL: boardURL,
+                                            threadId: thread.id,
+                                            threadTitle: thread.title ?? posts.first?.threadTitle
+                                        )
                                     })
                                     .listRowBackground(
                                         highlightedIndices.contains(index)
@@ -437,6 +445,7 @@ struct PostView: View {
     var onTripTap: (String) -> Void
     var onTextSelected: (SelectionData) -> Int? = { _ in nil }
     var onTapOutside: () -> Void = {}
+    var onReport: (() -> Void)? = nil
 
     @Environment(UserConfig.self) private var userConfig
     @State private var fullscreenImageURL: URL?
@@ -524,6 +533,12 @@ struct PostView: View {
                     NGFilterStore.shared.add(kind: .name, pattern: post.name)
                 } label: {
                     Label("この名前をNGにする", systemImage: "hand.raised")
+                }
+            }
+            if let onReport {
+                Divider()
+                Button(role: .destructive, action: onReport) {
+                    Label("通報する", systemImage: "flag")
                 }
             }
         }
