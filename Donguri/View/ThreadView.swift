@@ -45,6 +45,14 @@ struct ThreadView: View {
     // PopupView caches its rendered content in @State at init, so it needs a
     // fresh identity per lookup — otherwise it keeps the empty first render.
     @State private var popupGeneration = 0
+    /// Measured post-text heights, kept here rather than in each row so that
+    /// scrolling a row off screen and back doesn't re-run the 1pt-then-resize
+    /// cycle that made rows overlap.
+    @State private var postHeights: [Int: CGFloat] = [:]
+    /// Leading + trailing insets a `.plain` List puts around a row. The post
+    /// webview is laid out inside those, so the height estimate has to measure
+    /// against the narrower width, not the full screen.
+    private static let listRowHorizontalInsets: CGFloat = 32
 
     private var highlightedIndices: Set<Int> {
         if let highlightedID {
@@ -99,7 +107,9 @@ struct ThreadView: View {
                                             threadId: thread.id,
                                             threadTitle: thread.title ?? posts.first?.threadTitle
                                         )
-                                    })
+                                    }, contentWidth: geometry.size.width - Self.listRowHorizontalInsets,
+                                       measuredHeight: postHeights[index],
+                                       onHeightChange: { postHeights[index] = $0 })
                                     .listRowBackground(
                                         highlightedIndices.contains(index)
                                             ? Color.accentColor.opacity(0.15)
@@ -252,6 +262,7 @@ struct ThreadView: View {
             let service = PostService()
             let newPosts = try await service.fetchPosts(boardURL: boardURL, threadId: threadId)
             posts = newPosts
+            postHeights.removeAll()
             (idIndices, tripIndices) = Self.buildHighlightIndices(posts: newPosts)
             highlightedID = nil
             highlightedTrip = nil
@@ -447,9 +458,26 @@ struct PostView: View {
     var onTapOutside: () -> Void = {}
     var onReport: (() -> Void)? = nil
 
+    /// Width the post text will lay out at, used only to estimate the row's
+    /// height before the webview reports its real one.
+    var contentWidth: CGFloat = 320
+    /// Height already measured for this post, held by the parent so it survives
+    /// the List recycling this row. `nil` until the webview first reports.
+    var measuredHeight: CGFloat? = nil
+    var onHeightChange: ((CGFloat) -> Void)? = nil
+
     @Environment(UserConfig.self) private var userConfig
     @State private var fullscreenImageURL: URL?
-    @State private var textHeight: CGFloat = 0
+    @State private var localHeight: CGFloat?
+
+    /// The webview has no intrinsic content size, so the row is sized from an
+    /// estimate until the real height arrives over the JS bridge.
+    private var textFrameHeight: CGFloat {
+        if let height = measuredHeight ?? localHeight {
+            return max(height, 1)
+        }
+        return PostTextHeight.estimate(for: post.text, width: contentWidth)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -482,9 +510,17 @@ struct PostView: View {
                 onTapOutside: onTapOutside,
                 onPostReply: onPostReply,
                 onThreadRoute: onThreadRoute,
-                onHeightChange: { textHeight = $0 }
+                onHeightChange: { height in
+                    // Round up: a fractional shortfall clips the last line.
+                    // ResizeObserver re-fires on every layout, so ignore the
+                    // repeats rather than churning the List's row heights.
+                    let rounded = height.rounded(.up)
+                    guard rounded != localHeight else { return }
+                    localHeight = rounded
+                    onHeightChange?(rounded)
+                }
             )
-            .frame(height: max(textHeight, 1))
+            .frame(height: textFrameHeight)
 
             if !post.imageURLs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -520,6 +556,9 @@ struct PostView: View {
             }
         }
         .padding(.vertical, 4)
+        // A refresh can put different text at the same index; the old measured
+        // height must not survive it.
+        .onChange(of: post.text) { localHeight = nil }
         .contextMenu {
             if let id = post.id {
                 Button {
