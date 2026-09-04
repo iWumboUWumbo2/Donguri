@@ -69,7 +69,6 @@ struct ThreadView: View {
                                              tripCount: post.trip.flatMap { tripIndices[$0]?.count } ?? 0,
                                              isIDHighlighted: post.id != nil && post.id == highlightedID,
                                              isTripHighlighted: post.trip != nil && post.trip == highlightedTrip,
-                                             isHighlighted: highlightedIndices.contains(index),
                                              onThreadRoute: { route in
                                         threadRoute = route
                                     }, onPostReply: { postIndex in
@@ -85,9 +84,11 @@ struct ThreadView: View {
                                     }, onTapOutside: {
                                         dismissPopup()
                                     })
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(Color.clear)
-                                    .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
+                                    .listRowBackground(
+                                        highlightedIndices.contains(index)
+                                            ? Color.accentColor.opacity(0.15)
+                                            : Color.clear
+                                    )
                                     .id(index)
                                     .onAppear {
                                         maxSeenIndex = max(maxSeenIndex, index)
@@ -178,8 +179,6 @@ struct ThreadView: View {
             }
             }
             .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color(.systemGroupedBackground))
             .navigationTitle(thread.title ?? posts.first?.threadTitle ?? "無題")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $threadRoute) { route in
@@ -395,7 +394,6 @@ private struct ReplyPreviewCard: View {
                                          tripCount: posts[index].trip.flatMap { tripIndices[$0]?.count } ?? 0,
                                          isIDHighlighted: false,
                                          isTripHighlighted: false,
-                                         isHighlighted: false,
                                          onThreadRoute: onThreadRoute,
                                          onPostReply: { onShowReplies([$0]) },
                                          onShowReplies: onShowReplies,
@@ -422,7 +420,6 @@ struct PostView: View {
     var tripCount: Int
     var isIDHighlighted: Bool
     var isTripHighlighted: Bool
-    var isHighlighted: Bool = false
 
     var onThreadRoute: (ThreadRoute) -> Void
     var onPostReply: (Int) -> Void
@@ -504,14 +501,7 @@ struct PostView: View {
                 }
             }
         }
-        .padding(12)
-        .cardBackground(cornerRadius: 10, fill: Color(.secondarySystemGroupedBackground))
-        .overlay {
-            if isHighlighted {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.accentColor, lineWidth: 1.5)
-            }
-        }
+        .padding(.vertical, 4)
         .fullScreenCover(isPresented: Binding(
             get: { fullscreenImageURL != nil },
             set: { isPresented in if !isPresented { fullscreenImageURL = nil } }
