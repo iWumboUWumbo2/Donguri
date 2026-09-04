@@ -9,10 +9,12 @@
 /* Begin PBXBuildFile section */
 		6B486FF02FDF29C400F1F455 /* CHoshiDicts in Frameworks */ = {isa = PBXBuildFile; productRef = 6B486FF12FDF29C400F1F455 /* CHoshiDicts */; };
 		6B486FF32FDF29C400F1F455 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 6B486FF42FDF29C400F1F455 /* ZIPFoundation */; };
+		6B486FF72FDF29C400F1F455 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6B486FF62FDF29C400F1F455 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		6B486FDE2FDF29C400F1F455 /* Donguri.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Donguri.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6B486FF62FDF29C400F1F455 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -40,6 +42,7 @@
 			isa = PBXGroup;
 			children = (
 				6B486FE02FDF29C400F1F455 /* Donguri */,
+				6B486FF62FDF29C400F1F455 /* PrivacyInfo.xcprivacy */,
 				6B486FDF2FDF29C400F1F455 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -122,6 +125,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B486FF72FDF29C400F1F455 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

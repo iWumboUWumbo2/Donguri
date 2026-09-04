@@ -27,6 +27,18 @@ struct SettingsView: View {
                 } header: {
                     Text("辞書とマイニング")
                 }
+
+                Section {
+                    NavigationLink {
+                        NGFilterView()
+                    } label: {
+                        Label("NG設定", systemImage: "hand.raised")
+                    }
+                } header: {
+                    Text("表示")
+                } footer: {
+                    Text("特定の語句・ID・名前を含む書き込みを非表示にします。")
+                }
             }
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.inline)

@@ -33,6 +33,8 @@ struct ThreadView: View {
     @State private var maxSeenIndex: Int = 0
     @State private var resumeIndex: Int?
 
+    @State private var ngFilter = NGFilterStore.shared
+
     // Popup dictionary
     @Environment(UserConfig.self) private var userConfig
     @State private var selectionData: SelectionData?
@@ -63,6 +65,12 @@ struct ThreadView: View {
                         ZStack(alignment: .top) {
                             List {
                                 ForEach(Array(posts.enumerated()), id: \.offset) { index, post in
+                                    if ngFilter.hides(post) {
+                                        // Kept in place so >>N numbering stays correct.
+                                        AbornPlaceholder(index: index)
+                                            .listRowBackground(Color.clear)
+                                            .id(index)
+                                    } else {
                                     PostView(index: index,
                                              post: post,
                                              idCount: post.id.flatMap { idIndices[$0]?.count } ?? 0,
@@ -92,6 +100,7 @@ struct ThreadView: View {
                                     .id(index)
                                     .onAppear {
                                         maxSeenIndex = max(maxSeenIndex, index)
+                                    }
                                     }
                                 }
                             }
@@ -502,6 +511,22 @@ struct PostView: View {
             }
         }
         .padding(.vertical, 4)
+        .contextMenu {
+            if let id = post.id {
+                Button {
+                    NGFilterStore.shared.add(kind: .id, pattern: id)
+                } label: {
+                    Label("このIDをNGにする", systemImage: "hand.raised")
+                }
+            }
+            if !post.name.isEmpty {
+                Button {
+                    NGFilterStore.shared.add(kind: .name, pattern: post.name)
+                } label: {
+                    Label("この名前をNGにする", systemImage: "hand.raised")
+                }
+            }
+        }
         .fullScreenCover(isPresented: Binding(
             get: { fullscreenImageURL != nil },
             set: { isPresented in if !isPresented { fullscreenImageURL = nil } }
@@ -534,6 +559,27 @@ struct PostView: View {
         }
     }
 
+}
+
+/// Stands in for a post hidden by an NG rule. 5ch clients call this あぼーん.
+private struct AbornPlaceholder: View {
+    let index: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("\(index + 1)")
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 18, minHeight: 18)
+                .background(Circle().fill(Color.secondary.opacity(0.12)))
+            Text("あぼーん")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.vertical, 6)
+    }
 }
 
 private struct ImageThumbnail: View {
