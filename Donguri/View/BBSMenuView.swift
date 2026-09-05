@@ -143,7 +143,7 @@ struct CategoryDisclosureView: View {
             HStack(spacing: 8) {
                 Text(category.categoryName)
                     .font(.headline)
-                Chip(text: "\(category.categoryTotal)", tint: .secondary, filled: false)
+                Chip(text: "\(filteredCategoryContent.count)", tint: .secondary, filled: false)
             }
         }
     }
