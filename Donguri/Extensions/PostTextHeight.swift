@@ -55,7 +55,7 @@ enum PostTextHeight {
                       contentSize: UIApplication.shared.preferredContentSizeCategory)
         if let cached = cache[key] { return cached }
 
-        let measured = displayText(for: text)
+        let measured = text.asPlainPostText
 
         // Pin the line height to the CSS line box so the measured result is
         // already in the webview's units — deriving a line count from the
@@ -94,14 +94,5 @@ enum PostTextHeight {
         if cache.count > 2000 { cache.removeAll(keepingCapacity: true) }
         cache[key] = height
         return height
-    }
-
-    /// `PostService` hands us markdown-ish text — `>>N` anchors arrive as
-    /// `[>>N](donguri://res/N)`. Only the label is rendered, so only the label
-    /// should be measured.
-    private static func displayText(for text: String) -> String {
-        text.replacing(#/\[([^\]]*)\]\(([^)\s]+)\)/#) { match in
-            String(match.1)
-        }
     }
 }

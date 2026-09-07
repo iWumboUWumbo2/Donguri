@@ -15,6 +15,17 @@ extension String {
     /// webview needs real HTML, so escape everything first — the text is
     /// untrusted user content from 5ch and must never be injected as markup —
     /// then re-introduce only the links and line breaks we put there ourselves.
+    /// The post text as the reader actually sees it: `PostService` hands us
+    /// markdown-ish text where `>>N` anchors are `[>>N](donguri://res/N)`, and
+    /// only the label is ever rendered. Anything reasoning about the visible
+    /// text — measuring it, or handing it to the system translator — wants this
+    /// rather than the raw form, which would drag `donguri://` URLs along.
+    var asPlainPostText: String {
+        replacing(#/\[([^\]]*)\]\(([^)\s]+)\)/#) { match in
+            String(match.1)
+        }
+    }
+
     var asPostHTML: String {
         var s = self
             .replacingOccurrences(of: "&", with: "&amp;")

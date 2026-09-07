@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Translation
 
 struct ThreadRoute: Hashable {
     let boardURL: String
@@ -469,6 +470,7 @@ struct PostView: View {
     @Environment(UserConfig.self) private var userConfig
     @State private var fullscreenImageURL: URL?
     @State private var localHeight: CGFloat?
+    @State private var showTranslation = false
 
     /// The webview has no intrinsic content size, so the row is sized from an
     /// estimate until the real height arrives over the JS bridge.
@@ -560,6 +562,14 @@ struct PostView: View {
         // height must not survive it.
         .onChange(of: post.text) { localHeight = nil }
         .contextMenu {
+            if !post.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    showTranslation = true
+                } label: {
+                    Label("翻訳", systemImage: "translate")
+                }
+                Divider()
+            }
             if let id = post.id {
                 Button {
                     NGFilterStore.shared.add(kind: .id, pattern: id)
@@ -581,6 +591,10 @@ struct PostView: View {
                 }
             }
         }
+        // The system translator, as Messages and Safari present it. It wants the
+        // visible text, not PostService's `[>>N](donguri://res/N)` markdown.
+        .translationPresentation(isPresented: $showTranslation,
+                                 text: post.text.asPlainPostText)
         .fullScreenCover(isPresented: Binding(
             get: { fullscreenImageURL != nil },
             set: { isPresented in if !isPresented { fullscreenImageURL = nil } }
