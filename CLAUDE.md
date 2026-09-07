@@ -55,7 +55,7 @@ Two distinct layers live in this app, and they meet in exactly one place.
 - The Xcode project uses a **`PBXFileSystemSynchronizedRootGroup`**: any file added under `Donguri/` is picked up automatically. Do not hand-edit `project.pbxproj` to add source files or resources. `.js`/`.css` files land in the bundle root, which is what `Bundle.main.resourceURL` loading depends on.
 - `project.pbxproj` edits *are* needed for package dependencies. Current deps: `hoshidicts` (branch `main`) and `ZIPFoundation`; `libzstd` comes in transitively.
 - `SWIFT_OBJC_INTEROP_MODE = objcxx` is required (hoshidicts' modulemap declares `requires cplusplus`). Because that modulemap only exposes the C++ umbrella header, the C API is reached via `Donguri/Donguri-Bridging-Header.h` (`SWIFT_OBJC_BRIDGING_HEADER`).
-- Deployment target is iOS 26.0, so `glassEffect` and other Liquid Glass APIs are always available; ported code still carries `if #available(iOS 26, *)` branches from Hoshi Reader.
+- Deployment target is iOS 18.0 (lowered from 26.0 to run on an iPhone 13 mini), so the `if #available(iOS 26, *)` branches the ported code carries from Hoshi Reader are load-bearing — `glassEffect` and the other Liquid Glass APIs are *not* unconditionally available. `translationPresentation` (iOS 17.4+) is.
 - `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` — anything called from `Task.detached` (e.g. `DictionaryImporter.import`) needs explicit `nonisolated`.
 
 ## Gotchas that have already caused bugs

@@ -4,7 +4,7 @@
 
 # Donguri
 
-![Platform](https://img.shields.io/badge/platform-iOS%2026%2B-lightgrey)
+![Platform](https://img.shields.io/badge/platform-iOS%2018%2B-lightgrey)
 ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)
 
 **Donguri** (どんぐり — "acorn") is a 5ちゃんねる reader for iOS with a Yomitan-style
@@ -37,6 +37,15 @@ Essentially [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) for 5ch inst
 - Reply previews, read-position tracking and per-thread unread counts
 - Tap an ID or tripcode to highlight every post by that poster
 - Inline image thumbnails with a pinch-zoom fullscreen viewer
+- Filter the board list by name
+- **NG filtering** (あぼーん) on word, ID or name/tripcode — hidden posts leave a
+  placeholder so `>>N` numbering stays correct
+- Long-press a post to translate it with the system translator, or to filter or
+  report it
+
+<p align="center">
+    <img src="Pictures/06_context.png" width="30%" alt="post context menu">
+</p>
 
 </div>
 
@@ -55,7 +64,7 @@ via `x-callback-url` and needs the app installed on the same device.
 
 ## Building
 
-Requires Xcode 26+ and an iOS 26 simulator or device.
+Requires Xcode 26+ to build. Runs on iOS 18.0 or later.
 
 ```bash
 xcodebuild -project Donguri.xcodeproj -scheme Donguri -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build
