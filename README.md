@@ -42,6 +42,7 @@ Essentially [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) for 5ch inst
   placeholder so `>>N` numbering stays correct
 - Long-press a post to translate it with the system translator, or to filter or
   report it
+- Available in Japanese and English
 
 <p align="center">
     <img src="Pictures/06_context.png" width="30%" alt="post context menu">
@@ -92,6 +93,7 @@ files retain their original copyright and SPDX headers.
 | `Service/AppFileStorage.swift` | `Core/BookStorage.swift` (trimmed to generic file helpers) |
 | `Model/Anki.swift`, `Model/Dictionary.swift` | `Models/` |
 | `Extensions/CSSSanitizer.swift`, `Popup+Extensions.swift` | `Util/` |
+| `Dictionaries.xcstrings` | `Dictionaries.xcstrings` (keys and translator comments; Japanese added, Chinese dropped) |
 
 The dictionary engine is [hoshidicts](https://github.com/Manhhao/hoshidicts), also
 by Manhhao, consumed as a Swift package. Donguri drives its **C API**

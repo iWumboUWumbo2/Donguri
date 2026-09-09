@@ -17,11 +17,13 @@ struct NGRule: Codable, Identifiable, Hashable {
 
         var id: String { rawValue }
 
+        /// `String(localized:)` rather than a bare literal — this is a plain
+        /// `String` property, so nothing would look it up otherwise.
         var label: String {
             switch self {
-            case .word: "NGワード"
-            case .id: "NG ID"
-            case .name: "NG名前"
+            case .word: String(localized: "NGワード")
+            case .id: String(localized: "NG ID")
+            case .name: String(localized: "NG名前")
             }
         }
     }

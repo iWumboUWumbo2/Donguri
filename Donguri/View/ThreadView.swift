@@ -281,7 +281,7 @@ struct ThreadView: View {
                 }
             }
         } catch {
-            errorMessage = "エラーが発生しました: \(error)"
+            errorMessage = String(localized: "エラーが発生しました: \(String(describing: error))")
             print("ThreadView Error: \(error)")
         }
     }

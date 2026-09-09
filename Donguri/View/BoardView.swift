@@ -58,7 +58,7 @@ struct BoardView: View {
             let newThreads = try await service.fetchThreads(boardURL: board.url)
             threads = newThreads
         } catch {
-            errorMessage = "エラーが発生しました: \(error)"
+            errorMessage = String(localized: "エラーが発生しました: \(String(describing: error))")
             print("BoardView Error: \(error)")
         }
     }

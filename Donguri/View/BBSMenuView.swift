@@ -86,7 +86,7 @@ struct BBSMenuView: View {
             let newMenu = try await service.fetchBBSMenu()
             menu = newMenu
         } catch {
-            errorMessage = "エラーが発生しました: \(error)"
+            errorMessage = String(localized: "エラーが発生しました: \(String(describing: error))")
             print("BBSMenuView Error: \(error)")
         }
     }
